@@ -91,3 +91,24 @@ Stop Postgres and remove containers
 docker compose down
 ```
 
+## Lint & Format
+
+This repository includes ESLint and Prettier configuration at the repository root. Run the following from the repo root to check or fix code style across the workspace:
+
+```bash
+# install workspace deps first
+pnpm install
+
+# lint TypeScript files (type-aware ESLint rules require tsconfig.json paths)
+pnpm lint
+
+# fix lint issues automatically
+pnpm lint:fix
+
+# check formatting
+pnpm format:check
+
+# format files with Prettier
+pnpm format
+```
+
