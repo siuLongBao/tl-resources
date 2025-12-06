@@ -4,7 +4,20 @@ import tsParser from '@typescript-eslint/parser'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['node_modules', 'dist']),
+  globalIgnores([
+    'node_modules',
+    'dist',
+    'frontend/node_modules',
+    'backend/node_modules',
+    'shared/node_modules',
+    '.turbo',
+    'pnpm-lock.yaml',
+    'dist/**',
+    '**/dist/**',
+    'frontend/dist/**',
+    'backend/dist/**',
+    'shared/dist/**',
+  ]),
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
     languageOptions: {
@@ -13,6 +26,10 @@ export default defineConfig([
       globals: { ...globals.node, ...globals.browser },
     },
     extends: [js.configs.recommended],
+    rules: {
+      // Disallow general console usage but allow warn/error/info
+      'no-console': ['error', { allow: ['warn', 'error', 'info'] }],
+    },
   },
   {
     files: ['**/*.{ts,tsx}'],
