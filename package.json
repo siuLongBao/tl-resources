@@ -12,6 +12,10 @@
     "shared"
   ],
   "scripts": {
+    "test": "turbo run test",
+    "test:watch": "turbo run test -- --watch",
+    "test:ci": "turbo run test -- --run",
+    "test:coverage": "turbo run test -- --run --coverage",
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
     "start": "turbo run start",
@@ -31,6 +35,10 @@
     "eslint-config-standard": "^17.1.0",
     "eslint-plugin-import": "^2.32.0",
     "prettier": "^3.7.4",
-    "turbo": "^2.6.3"
+    "turbo": "^2.6.3",
+    "vitest": "^1.0.0",
+    "jsdom": "^21.0.0",
+    "@vitest/ui": "^0.22.0",
+    "@vitest/coverage-v8": "^1.0.0"
   }
 }

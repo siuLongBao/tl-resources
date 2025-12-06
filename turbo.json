@@ -18,5 +18,10 @@
     "format": {
       "outputs": []
     }
+  ,
+    "test": {
+      "dependsOn": ["^test"],
+      "outputs": []
+    }
   }
 }

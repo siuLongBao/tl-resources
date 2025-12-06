@@ -12,6 +12,9 @@
     "start": "node dist/index.js",
     "prisma": "prisma",
     "lint": "eslint './**/*.{ts,tsx,js,jsx}' --ext .ts,.tsx,.js,.jsx",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:ci": "vitest --run",
     "format": "prettier --write '**/*.{ts,tsx,js,jsx,json,md}'"
   },
   "dependencies": {
