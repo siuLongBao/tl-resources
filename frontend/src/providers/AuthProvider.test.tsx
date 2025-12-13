@@ -1,4 +1,5 @@
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { actAsync } from '../utils/testUtils';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import AuthProvider from './AuthProvider';
 import { useAuth } from '../hooks/useAuth';
@@ -52,7 +53,7 @@ describe('AuthProvider', () => {
 
     await waitFor(() => expect(screen.getByTestId('ready').textContent).toBe('true'));
 
-    act(() => {
+    await actAsync(async () => {
       // simulate storage event
       const ev = new StorageEvent('storage', { key: 'token', newValue: 'newtok' } as any);
       window.dispatchEvent(ev);
@@ -72,7 +73,7 @@ describe('AuthProvider', () => {
 
     await waitFor(() => expect(screen.getByTestId('ready').textContent).toBe('true'));
 
-    await act(async () => {
+    await actAsync(async () => {
       screen.getByTestId('do-login').click();
     });
 
@@ -92,10 +93,10 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(screen.getByTestId('ready').textContent).toBe('true'));
 
     // authenticate first
-    act(() => screen.getByTestId('do-auth').click());
+    await actAsync(async () => screen.getByTestId('do-auth').click());
     await waitFor(() => expect(screen.getByTestId('token').textContent).toBe('tkn'));
 
-    act(() => screen.getByTestId('do-logout').click());
+    await actAsync(async () => screen.getByTestId('do-logout').click());
     await waitFor(() => expect(screen.getByTestId('token').textContent).toBe(''));
     expect(localStorage.getItem('token')).toBeNull();
   });
