@@ -6,6 +6,8 @@ import AppButton from '../../components/ui/AppButton';
 import { login as loginService } from '../../services/authService';
 import { setToken } from '../../utils/request';
 import { loginSchema, type LoginInput } from '../../../../shared/src/index';
+import { useApi } from '../../hooks/useApi';
+import { ApiError } from '../../utils/ApiErrors';
 
 type FieldErrors = Partial<Record<keyof LoginInput, string>>;
 
@@ -14,7 +16,10 @@ export default function LoginForm() {
   const [values, setValues] = useState<LoginInput>({ email: '', password: '' });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { execute, loading } = useApi(
+    (payload: LoginInput, signal?: AbortSignal) => loginService(payload, signal),
+    { autoThrow: true },
+  );
 
   const handleChange = (field: keyof LoginInput) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setValues((prev) => ({ ...prev, [field]: e.target.value }));
@@ -42,8 +47,8 @@ export default function LoginForm() {
     }
 
     try {
-      setLoading(true);
-      const data: any = await loginService(result.data);
+      setServerError(null);
+      const data: any = await execute(result.data);
       // data expected { token, id }
       if (data && data.token) {
         setToken(data.token);
@@ -52,9 +57,17 @@ export default function LoginForm() {
         setServerError('Invalid response from server');
       }
     } catch (err: any) {
+      // Map field errors if backend returned details
+      if (err instanceof ApiError && err.details && typeof err.details === 'object') {
+        const fieldErrs: FieldErrors = {};
+        const details = err.details as Record<string, unknown>;
+        for (const k of Object.keys(details)) {
+          const v = details[k];
+          if (typeof v === 'string') fieldErrs[k as keyof LoginInput] = v;
+        }
+        setErrors(fieldErrs);
+      }
       setServerError(err?.message || 'Login failed');
-    } finally {
-      setLoading(false);
     }
   };
 

@@ -1,173 +1,178 @@
-export type Maybe<T> = T | undefined;
+// frontend/src/services/request.ts
+import type { ApiResponse, ApiFailure } from '../../../shared/src/types/api';
+import { ApiError } from './ApiErrors';
 
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || '';
-const TOKEN_KEY = 'auth_token';
+/** Allowed HTTP methods */
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-export class ApiError extends Error {
-  status: number;
-  data: any;
-  details?: any;
-
-  constructor(message: string, status: number, data?: any) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.data = data;
-  }
-}
-
-function buildQuery(params?: Record<string, any>): string {
-  if (!params) return '';
-  const esc = encodeURIComponent;
-  const query = Object.entries(params)
-    .filter(([, v]) => v !== undefined && v !== null)
-    .map(([k, v]) => {
-      if (Array.isArray(v)) return v.map((x) => `${esc(k)}=${esc(String(x))}`).join('&');
-      return `${esc(k)}=${esc(String(v))}`;
-    })
-    .join('&');
-  return query ? `?${query}` : '';
-}
-
-export function setToken(token: string) {
-  try {
-    localStorage.setItem(TOKEN_KEY, token);
-  } catch (e) {
-    console.error('Failed to set token in localStorage', e);
-  }
-}
-
-export function getToken(): Maybe<string> {
-  try {
-    return localStorage.getItem(TOKEN_KEY) || undefined;
-  } catch (e) {
-    console.error('Failed to get token from localStorage', e);
-  }
-}
-
-export function clearToken() {
-  try {
-    localStorage.removeItem(TOKEN_KEY);
-  } catch (e) {
-    console.error('Failed to remove token from localStorage', e);
-  }
-}
-
+/** Extra request options */
 export type RequestOptions = {
-  method?: string;
-  params?: Record<string, any>;
-  data?: any;
-  headers?: any;
-  skipAuth?: boolean;
+  headers?: Record<string, string>;
+  params?: Record<string, string | number | boolean>;
+  data?: unknown | FormData;
+  auth?: boolean;
+  raw?: boolean; // return raw Response (file download, etc.)
+  signal?: AbortSignal; // optional abort signal to cancel request
 };
 
-export async function request<T = any>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', params, data, headers = {}, skipAuth = false } = opts;
-  const query = buildQuery(params);
-  const url = `${BASE_URL}${path}${query}`;
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || '';
 
-  const h: Record<string, string> = {};
-  // don't set content-type for FormData
-  const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
-  if (!isFormData && data !== undefined && data !== null && method !== 'GET') {
-    h['Content-Type'] = 'application/json';
+/** Build URL with query params */
+function buildUrl(path: string, params?: Record<string, string | number | boolean>) {
+  const base =
+    BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+  const url = new URL(path, base);
+
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      url.searchParams.set(key, String(value));
+    });
   }
+  return url.toString();
+}
 
-  // attach extra provided headers
-  Object.assign(h, headers as Record<string, string>);
-
-  if (!skipAuth) {
-    const token = getToken();
-    if (token) h['Authorization'] = `Bearer ${token}`;
+/** Read token */
+function getToken() {
+  try {
+    return localStorage.getItem('token');
+  } catch {
+    return null;
   }
+}
 
-  const init: any = {
-    method,
-    headers: h,
+/** Set token (helper for auth flows) */
+export function setToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem('token', token);
+    else localStorage.removeItem('token');
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export { getToken };
+
+/** Core request function */
+export async function request<T = any>(
+  method: HttpMethod,
+  path: string,
+  opts: RequestOptions = {},
+): Promise<T> {
+  const { headers = {}, params, data, auth = true, raw = false, signal } = opts;
+
+  const url = buildUrl(path, params);
+
+  // Build headers
+  const finalHeaders: Record<string, string> = {
+    ...headers,
   };
 
-  if (data !== undefined && data !== null && method !== 'GET') {
-    init.body = isFormData ? (data as FormData) : JSON.stringify(data);
+  // eslint-disable-next-line no-undef
+  let body: BodyInit | undefined;
+
+  if (data instanceof FormData) {
+    body = data;
+  } else if (data !== undefined) {
+    // Only set Content-Type if caller didn't provide one (case-insensitive)
+    const hasContentType = Object.keys(finalHeaders).some(
+      (k) => k.toLowerCase() === 'content-type',
+    );
+    if (!hasContentType) finalHeaders['Content-Type'] = 'application/json';
+    body = JSON.stringify(data);
   }
 
-  const res = await fetch(url, init);
+  if (auth) {
+    const token = getToken();
+    if (token) finalHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, {
+    method,
+    headers: finalHeaders,
+    body,
+    credentials: 'include',
+    signal,
+  });
+
+  if (raw) {
+    if (!res.ok) throw new ApiError(res.statusText, undefined, undefined, res.status);
+    return res as unknown as T;
+  }
 
   const contentType = res.headers.get('content-type') || '';
-  let parsed: any = undefined;
-  if (contentType.includes('application/json')) {
-    parsed = await res.json();
+  const isJson = contentType.includes('application/json');
+
+  let payload: any = null;
+
+  // Short-circuit No Content
+  if (res.status === 204) return undefined as unknown as T;
+
+  if (isJson) {
+    try {
+      // read as text then parse only if non-empty (safer for empty bodies)
+      const txt = await res.text();
+      payload = txt ? JSON.parse(txt) : null;
+    } catch {
+      payload = null;
+    }
   } else {
-    parsed = await res.text();
+    try {
+      payload = await res.text();
+    } catch {
+      payload = null;
+    }
   }
 
   if (!res.ok) {
-    // If backend follows shared ApiResponse shape, try to extract error message
-    if (
-      parsed &&
-      typeof parsed === 'object' &&
-      'success' in parsed &&
-      parsed.success === false &&
-      parsed.error
-    ) {
-      const errObj = (parsed as any).error;
-      const message = errObj?.message || res.statusText || '请求出错';
-      const apiErr = new ApiError(message, res.status, parsed);
-      apiErr.details = errObj?.details;
-      throw apiErr;
+    if (payload && typeof payload === 'object' && payload.success === false && payload.error) {
+      const failure = payload as ApiFailure;
+      throw new ApiError(
+        failure.error.message,
+        failure.error.code,
+        failure.error.details,
+        res.status,
+        payload,
+      );
     }
 
-    const message = (parsed && parsed.message) || res.statusText || '请求出错';
-    throw new ApiError(message, res.status, parsed);
+    const message = payload?.message || res.statusText || 'Request failed';
+
+    throw new ApiError(message, undefined, payload, res.status, payload);
   }
 
-  // 204 No Content
-  if (res.status === 204) return undefined as unknown as T;
+  if (isJson) {
+    const resp = payload as ApiResponse<T>;
 
-  // If backend returns shared ApiResponse<T> shape, unwrap data
-  if (parsed && typeof parsed === 'object' && 'success' in parsed) {
-    if ((parsed as any).success === true) return (parsed as any).data as T;
-    // success === false was already handled above for non-ok responses, but handle defensively
-    const errObj = (parsed as any).error;
-    const message = errObj?.message || '请求出错';
-    const apiErr = new ApiError(message, res.status, parsed);
-    apiErr.details = errObj?.details;
-    throw apiErr;
+    if (resp.success === true) {
+      return resp.data as T;
+    }
+
+    if (resp.success === false) {
+      throw new ApiError(
+        resp.error.message,
+        resp.error.code,
+        resp.error.details,
+        res.status,
+        payload,
+      );
+    }
+
+    throw new ApiError('Invalid API response format', undefined, payload, res.status, payload);
   }
-
-  return parsed as T;
+  return payload as T;
 }
 
-export const get = <T = any>(
-  path: string,
-  params?: Record<string, any>,
-  opts?: Omit<RequestOptions, 'params' | 'method'>,
-) => request<T>(path, { ...(opts || {}), params, method: 'GET' });
-
-export const post = <T = any>(
-  path: string,
-  data?: any,
-  opts?: Omit<RequestOptions, 'data' | 'method'>,
-) => request<T>(path, { ...(opts || {}), data, method: 'POST' });
-
-export const put = <T = any>(
-  path: string,
-  data?: any,
-  opts?: Omit<RequestOptions, 'data' | 'method'>,
-) => request<T>(path, { ...(opts || {}), data, method: 'PUT' });
-
-export const del = <T = any>(
-  path: string,
-  data?: any,
-  opts?: Omit<RequestOptions, 'data' | 'method'>,
-) => request<T>(path, { ...(opts || {}), data, method: 'DELETE' });
-
-export default {
+/** Shorthand */
+export const api = {
   request,
-  get,
-  post,
-  put,
-  del,
-  setToken,
-  getToken,
-  clearToken,
+  get: <T>(path: string, opts?: Omit<RequestOptions, 'data'>) => request<T>('GET', path, opts),
+  post: <T>(path: string, data?: any, opts?: Omit<RequestOptions, 'data'>) =>
+    request<T>('POST', path, { ...(opts || {}), data }),
+  put: <T>(path: string, data?: any, opts?: Omit<RequestOptions, 'data'>) =>
+    request<T>('PUT', path, { ...(opts || {}), data }),
+  patch: <T>(path: string, data?: any, opts?: Omit<RequestOptions, 'data'>) =>
+    request<T>('PATCH', path, { ...(opts || {}), data }),
+  delete: <T>(path: string, opts?: Omit<RequestOptions, 'data'>) =>
+    request<T>('DELETE', path, opts),
 };
