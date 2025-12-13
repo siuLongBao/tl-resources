@@ -5,11 +5,7 @@ import { findUserByEmail } from '../repositories/userRepository';
 import { HttpError } from '../errors/HttpError';
 import { ErrorCode, ErrorMessage, HttpStatus } from '../../../shared/src/types/api';
 import config from '../utils/config';
-
-type LoginInput = {
-  email: string;
-  password: string;
-};
+import type { LoginInput } from '../../../shared/src/schemas/auth';
 
 export const loginService = async (payload: LoginInput) => {
   const { email, password } = payload;
