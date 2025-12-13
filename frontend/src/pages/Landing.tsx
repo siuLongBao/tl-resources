@@ -1,42 +1,13 @@
-import { Container, Typography, Button, Box, Stack, AppBar, Toolbar } from '@mui/material';
+import { Container, Typography, Button, Box, Stack } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { getToken } from '../utils/request';
-import UserMenu from '../components/UserMenu';
+import Header from '../components/Header';
 
 export default function Landing() {
   const navigate = useNavigate();
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar position="static" color="transparent" sx={{ px: { xs: 2, md: 6 } }}>
-        <Toolbar
-          disableGutters
-          sx={{ minHeight: 64, display: 'flex', justifyContent: 'space-between' }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: 0.4 }}>
-              Luma AI
-            </Typography>
-          </Box>
-
-          <Box>
-            <Stack direction="row" spacing={1} alignItems="center">
-              {getToken() ? (
-                <UserMenu />
-              ) : (
-                <>
-                  <Button color="inherit" onClick={() => navigate('/login')}>
-                    Login
-                  </Button>
-                  <Button variant="contained" onClick={() => navigate('/register')}>
-                    Register
-                  </Button>
-                </>
-              )}
-            </Stack>
-          </Box>
-        </Toolbar>
-      </AppBar>
+      <Header />
 
       <Container maxWidth="lg">
         <Box
