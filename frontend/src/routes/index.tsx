@@ -9,9 +9,6 @@ export default function AppRoutes() {
       <Route path="/" element={<Landing />} />
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
-      {/* Add more routes here as needed */}
-      {/* <Route path="/login" element={<Login />} /> */}
-      {/* <Route path="/about" element={<About />} /> */}
     </Routes>
   );
 }

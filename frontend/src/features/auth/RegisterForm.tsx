@@ -5,6 +5,8 @@ import { createUserSchema, type CreateUserInput } from '../../../../shared/src/i
 import AppTextField from '../../components/forms/AppTextField';
 import AppButton from '../../components/ui/AppButton';
 import { createUser } from '../../services/userService';
+import { useApi } from '../../hooks/useApi';
+import { ApiError } from '../../utils/ApiErrors';
 
 type FieldErrors = Partial<Record<keyof CreateUserInput, string>>;
 
@@ -19,6 +21,9 @@ export default function RegisterForm() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { execute } = useApi((payload: CreateUserInput, signal?: AbortSignal) =>
+    createUser(payload, signal),
+  );
 
   const handleChange =
     (field: keyof CreateUserInput) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,12 +52,18 @@ export default function RegisterForm() {
 
     try {
       setSubmitting(true);
-      await createUser(result.data);
+      await execute(result.data);
       navigate('/login');
     } catch (err: any) {
       // Map backend field errors if present, otherwise show message
-      if (err?.data && typeof err.data === 'object' && err.data.errors) {
-        setErrors(err.data.errors);
+      if (err instanceof ApiError && err.details && typeof err.details === 'object') {
+        const details = err.details as Record<string, unknown>;
+        const fieldErrs: FieldErrors = {};
+        for (const k of Object.keys(details)) {
+          const v = details[k];
+          if (typeof v === 'string') fieldErrs[k as keyof CreateUserInput] = v;
+        }
+        setErrors(fieldErrs);
       } else {
         setServerError(err?.message || 'Registration failed');
       }
