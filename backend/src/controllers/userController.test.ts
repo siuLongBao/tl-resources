@@ -1,4 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { HttpStatus, ErrorCode } from '../../../shared/src/types/api';
 
 import { createUser } from './userController';
 
@@ -23,7 +24,7 @@ describe('userController.createUser', () => {
 
     await createUser(req, res);
 
-    expect(status).toHaveBeenCalledWith(201);
+    expect(status).toHaveBeenCalledWith(HttpStatus.CREATED);
     expect(json).toHaveBeenCalledWith({
       success: true,
       data: { id: 42 },
@@ -32,7 +33,9 @@ describe('userController.createUser', () => {
 
   it('returns structured error on HttpError', async () => {
     const HttpError = (await import('../errors/HttpError')).HttpError;
-    (createUserService as any).mockRejectedValue(new HttpError(409, 'User exists', 'USER_EXISTS'));
+    (createUserService as any).mockRejectedValue(
+      new HttpError(HttpStatus.CONFLICT, 'User exists', ErrorCode.USER_EXISTS),
+    );
 
     const req: any = { body: { email: 'a@b.com', password: 'pass' } };
     const status = vi.fn().mockReturnThis();
@@ -41,10 +44,10 @@ describe('userController.createUser', () => {
 
     await createUser(req, res);
 
-    expect(status).toHaveBeenCalledWith(409);
+    expect(status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
     expect(json).toHaveBeenCalledWith({
       success: false,
-      error: { code: 'USER_EXISTS', message: 'User exists' },
+      error: { code: ErrorCode.USER_EXISTS, message: 'User exists' },
     });
   });
 });

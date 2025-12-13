@@ -6,6 +6,7 @@ const TOKEN_KEY = 'auth_token';
 export class ApiError extends Error {
   status: number;
   data: any;
+  details?: any;
 
   constructor(message: string, status: number, data?: any) {
     super(message);
@@ -110,7 +111,9 @@ export async function request<T = any>(path: string, opts: RequestOptions = {}):
     ) {
       const errObj = (parsed as any).error;
       const message = errObj?.message || res.statusText || '请求出错';
-      throw new ApiError(message, res.status, parsed);
+      const apiErr = new ApiError(message, res.status, parsed);
+      apiErr.details = errObj?.details;
+      throw apiErr;
     }
 
     const message = (parsed && parsed.message) || res.statusText || '请求出错';
@@ -126,7 +129,9 @@ export async function request<T = any>(path: string, opts: RequestOptions = {}):
     // success === false was already handled above for non-ok responses, but handle defensively
     const errObj = (parsed as any).error;
     const message = errObj?.message || '请求出错';
-    throw new ApiError(message, res.status, parsed);
+    const apiErr = new ApiError(message, res.status, parsed);
+    apiErr.details = errObj?.details;
+    throw apiErr;
   }
 
   return parsed as T;

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { ZodError, z } from 'zod';
 import { errorHandler } from './errorHandler';
 import { HttpError } from '../errors/HttpError';
+import { ErrorCode, ErrorMessage, HttpStatus } from '../../../shared/src/types/api';
 
 describe('errorHandler middleware', () => {
   const makeRes = () => {
@@ -14,14 +15,14 @@ describe('errorHandler middleware', () => {
     const req: any = { path: '/x', method: 'POST' };
     const res = makeRes();
 
-    const err = new HttpError(409, 'User exists', 'USER_EXISTS');
+    const err = new HttpError(HttpStatus.CONFLICT, 'User exists', ErrorCode.USER_EXISTS);
 
     errorHandler(err, req, res, vi.fn() as any);
 
-    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
     expect(res.json).toHaveBeenCalledWith({
       success: false,
-      error: { code: 'USER_EXISTS', message: 'User exists' },
+      error: { code: ErrorCode.USER_EXISTS, message: 'User exists' },
     });
   });
 
@@ -35,10 +36,16 @@ describe('errorHandler middleware', () => {
 
     errorHandler(err, req, res, vi.fn() as any);
 
-    expect(res.status).toHaveBeenCalledWith(422);
+    const expectedDetails = err.flatten ? err.flatten() : { issues: err.issues };
+
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.UNPROCESSABLE_ENTITY);
     expect(res.json).toHaveBeenCalledWith({
       success: false,
-      error: { code: 'VALIDATION_ERROR', message: 'Validation Error' },
+      error: {
+        code: ErrorCode.VALIDATION_ERROR,
+        message: ErrorMessage.VALIDATION_ERROR,
+        details: expectedDetails,
+      },
     });
   });
 
@@ -50,10 +57,16 @@ describe('errorHandler middleware', () => {
 
     errorHandler(err, req, res, vi.fn() as any);
 
-    expect(res.status).toHaveBeenCalledWith(409);
+    const expectedDetails = err.meta;
+
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
     expect(res.json).toHaveBeenCalledWith({
       success: false,
-      error: { code: 'UNIQUE_CONSTRAINT', message: 'Conflict' },
+      error: {
+        code: ErrorCode.UNIQUE_CONSTRAINT,
+        message: ErrorMessage.CONFLICT,
+        details: expectedDetails,
+      },
     });
   });
 
@@ -65,10 +78,10 @@ describe('errorHandler middleware', () => {
 
     errorHandler(err, req, res, vi.fn() as any);
 
-    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
     expect(res.json).toHaveBeenCalledWith({
       success: false,
-      error: { code: 'INTERNAL_ERROR', message: 'Internal Server Error' },
+      error: { code: ErrorCode.INTERNAL_ERROR, message: ErrorMessage.INTERNAL_SERVER_ERROR },
     });
   });
 });
