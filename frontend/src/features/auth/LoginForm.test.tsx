@@ -65,7 +65,6 @@ describe('LoginForm', () => {
 
     const email = screen.getByLabelText('Email') as HTMLInputElement;
     const pass = screen.getByLabelText('Password') as HTMLInputElement;
-    const btn = screen.getByText('Login');
 
     await actAsync(async () => {
       // provide valid client-side values so server error mapping runs
