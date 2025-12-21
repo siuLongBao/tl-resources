@@ -72,7 +72,7 @@ export default function DashboardLayout() {
           <button
             aria-label="Toggle sidebar"
             onClick={() => setCollapsed((c) => !c)}
-            style={{ padding: 6, borderRadius: 6 }}
+            style={{ padding: 6, borderRadius: 6, backgroundColor: 'white' }}
           >
             {collapsed ? '▸' : '◂'}
           </button>
